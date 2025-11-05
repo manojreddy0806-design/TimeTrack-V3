@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>EOD — TimeTrack</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+    <div class="navbar">
+        <div class="nav-left">
+            <div class="logo">⏰ TimeTrack</div>
+            <nav class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="timeclock.html">Time Clock</a>
+                <a href="inventory.html">Inventory</a>
+                <a href="eod.html">End of Day</a>
+
+            </nav>
+        </div>
+        <div class="nav-right">
+            
+            <a href="#" class="btn-logout" onclick="logoutApp()">Logout</a>
+        </div>
+    </div>
+    <div class="container">
+        <div id="eodRoot" class="eod-form">
+            <h2>💰 End of Day Submission</h2>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+                <div class="form-group">
+                    <label>Cash Amount ($)</label>
+                    <input id="cashAmount" type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" class="eod-input" oninput="this.value = this.value.replace(/[^0-9.]/g, ''); this.value = this.value.replace(/(\..*)\./g, '$1');" />
+                </div>
+                <div class="form-group">
+                    <label>Credit Amount ($)</label>
+                    <input id="creditAmount" type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" class="eod-input" oninput="this.value = this.value.replace(/[^0-9.]/g, ''); this.value = this.value.replace(/(\..*)\./g, '$1');" />
+                </div>
+                <div class="form-group">
+                    <label>Boxes Count</label>
+                    <input id="boxesCount" type="text" inputmode="numeric" pattern="[0-9]*" class="eod-input" oninput="this.value = this.value.replace(/[^0-9]/g, '');" />
+                </div>
+                <div class="form-group">
+                    <label>QPay Amount ($)</label>
+                    <input id="qpayAmount" type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" class="eod-input" oninput="this.value = this.value.replace(/[^0-9.]/g, ''); this.value = this.value.replace(/(\..*)\./g, '$1');" />
+                </div>
+                <div class="form-group">
+                    <label>Total1</label>
+                    <input id="total1" type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" class="eod-input" oninput="this.value = this.value.replace(/[^0-9.]/g, ''); this.value = this.value.replace(/(\..*)\./g, '$1');" />
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:12px">
+                <label>Notes (e.g., missing money, discrepancies, issues)</label>
+                <textarea id="eodNotes" rows="4" placeholder="Enter any notes about missing money, discrepancies, or other issues..."></textarea>
+            </div>
+            <div style="margin-top:12px">
+                <button id="submitEodBtn" class="bulk-update-btn">💰 Submit End of Day</button>
+            </div>
+        </div>
+    </div>
+    <script src="static/js/script.js"></script>
+</body>
+</html>

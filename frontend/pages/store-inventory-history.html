@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Inventory History — TimeTrack</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .inventory-grid-container {
+            overflow-x: auto;
+            margin-top: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+        }
+        .inventory-grid-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+        .inventory-grid-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: center;
+            font-weight: 700;
+            color: #2c3e50;
+            border: 1px solid #dee2e6;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .inventory-grid-table th.item-header {
+            text-align: left;
+            position: sticky;
+            left: 0;
+            background: #f8f9fa;
+            z-index: 11;
+        }
+        .inventory-grid-table td {
+            padding: 10px 12px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+            color: #495057;
+        }
+        .inventory-grid-table td.item-cell {
+            text-align: left;
+            font-weight: 600;
+            color: #2c3e50;
+            position: sticky;
+            left: 0;
+            background: white;
+            z-index: 9;
+        }
+        .inventory-grid-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+        .inventory-grid-table tbody tr.special-row {
+            background: #fff3cd;
+            font-weight: 700;
+        }
+        .inventory-grid-table tbody tr.special-row td.item-cell {
+            background: #fff3cd;
+        }
+        .empty-cell {
+            color: #adb5bd;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="nav-left">
+            <div class="logo">⏰ TimeTrack</div>
+            <nav class="nav-links">
+                <a href="manager.html">Manager Dashboard</a>
+            </nav>
+        </div>
+        <div class="nav-right">
+            <a href="#" class="btn-logout" onclick="logoutApp()">Logout</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h2 id="storeTitle" style="margin: 0;">Inventory History</h2>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button id="refreshBtn" class="bulk-update-btn" style="background:#17a2b8;margin-top:0;" onclick="loadInventoryHistory(); showSuccess('History refreshed');" title="Refresh history">🔄 Refresh</button>
+                <span id="autoRefreshIndicator" style="font-size:0.85rem;color:#6c757d;margin-left:4px;" title="Auto-refreshing every 10 seconds">🔄 Auto-refresh ON</span>
+                <button id="downloadExcelBtn" class="bulk-update-btn" style="background:#28a745;margin-top:0;display:none;" onclick="downloadInventoryExcel();">📥 Download Excel</button>
+            </div>
+        </div>
+        <div style="margin-top:12px">
+            <button id="backBtn" class="bulk-update-btn" style="background:#6c757d">← Back to Store</button>
+            <button id="backToCardsBtn" class="bulk-update-btn" style="background:#6c757d;margin-left:12px;display:none;" onclick="backToCards();">← Back</button>
+        </div>
+        <div id="historyListContainer" style="margin-top:20px"></div>
+        <div id="gridViewContainer" style="margin-top:20px; display: none;"></div>
+    </div>
+    
+    <script src="static/js/script.js"></script>
+    <script>
+        // Check session
+        const session = loadSession();
+        if (!session || session.role !== 'manager') {
+            showError('Access denied. Manager login required.');
+            window.location = 'index.html';
+        }
+        
+        // Get store name from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const storeName = urlParams.get('store') || 'Store';
+        
+        // Update title
+        document.getElementById('storeTitle').textContent = `Inventory History — ${storeName}`;
+        
+        // Back button
+        document.getElementById('backBtn').addEventListener('click', () => {
+            window.location = 'manager.html';
+        });
+        
+        // Back to cards button - update visibility when viewing grid
+        const updateBackToCardsButton = () => {
+            const backToCardsBtn = document.getElementById('backToCardsBtn');
+            const gridContainer = document.getElementById('gridViewContainer');
+            if (backToCardsBtn && gridContainer) {
+                backToCardsBtn.style.display = gridContainer.style.display === 'block' ? 'inline-block' : 'none';
+            }
+        };
+        
+        // Call update when page loads
+        updateBackToCardsButton();
+        
+        let allSnapshots = [];
+        let gridData = null;
+        let currentPeriodIndex = null;
+        
+        // Load inventory history and show cards
+        async function loadInventoryHistory() {
+            const container = document.getElementById('historyListContainer');
+            const gridContainer = document.getElementById('gridViewContainer');
+            
+            // Show loading state
+            container.innerHTML = '<div class="no-data" style="text-align:center;padding:40px;">Loading inventory history...</div>';
+            
+            try {
+                console.log('Loading inventory history for store:', storeName);
+                allSnapshots = await apiGet('/inventory/history', { store_id: storeName });
+                console.log('Received snapshots:', allSnapshots.length);
+                
+                if (allSnapshots.length === 0) {
+                    container.innerHTML = '<div class="no-data" style="text-align:center;padding:40px;">No inventory history found for this store.</div>';
+                    gridContainer.style.display = 'none';
+                    return;
+                }
+                
+                // Sort by date (newest first)
+                allSnapshots.sort((a, b) => {
+                    const dateA = new Date(a.snapshot_date);
+                    const dateB = new Date(b.snapshot_date);
+                    return dateB - dateA; // Newest first
+                });
+                
+                // Group into 11-day periods
+                const periods = groupIntoPeriods(allSnapshots, 11);
+                
+                // Render cards
+                renderPeriodCards(periods, container);
+                
+                // Hide grid view
+                gridContainer.style.display = 'none';
+                
+            } catch (err) {
+                console.error('Failed to load inventory history:', err);
+                container.innerHTML = '<div class="no-data" style="text-align:center;padding:40px;color:#dc3545;">Failed to load inventory history. Please try again.</div>';
+                gridContainer.style.display = 'none';
+            }
+        }
+        
+        // Group snapshots into periods of specified days with 1-day overlap
+        function groupIntoPeriods(snapshots, daysPerPeriod) {
+            const periods = [];
+            
+            if (snapshots.length === 0) {
+                return periods;
+            }
+            
+            let currentIndex = 0;
+            let isFirstPeriod = true;
+            
+            while (currentIndex < snapshots.length) {
+                let periodSnapshots;
+                
+                if (isFirstPeriod) {
+                    // First period: take latest 11 days (no overlap needed)
+                    periodSnapshots = snapshots.slice(currentIndex, currentIndex + daysPerPeriod);
+                    currentIndex += daysPerPeriod;
+                    isFirstPeriod = false;
+                } else {
+                    // Subsequent periods: end date should be the previous period's start date (1-day overlap)
+                    // So if previous period is Jan 15-25, next period should be Jan 4-14
+                    // We need to find the snapshot that ends where previous period starts
+                    const previousPeriod = periods[periods.length - 1];
+                    const previousStartDate = previousPeriod.startDate;
+                    
+                    // Helper to normalize date to YYYY-MM-DD
+                    const normalizeDate = (date) => {
+                        const d = new Date(date);
+                        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    };
+                    
+                    // Find the snapshot that matches the previous period's start date (this will be our end date)
+                    const previousStartDateStr = normalizeDate(previousStartDate);
+                    
+                    // Find the index of this date in snapshots
+                    let endIndex = -1;
+                    for (let i = 0; i < snapshots.length; i++) {
+                        const snapshotDateStr = normalizeDate(snapshots[i].snapshot_date);
+                        if (snapshotDateStr === previousStartDateStr) {
+                            endIndex = i;
+                            break;
+                        }
+                    }
+                    
+                    if (endIndex === -1 || endIndex === 0) {
+                        // Couldn't find the overlap date or no more snapshots before it
+                        break;
+                    }
+                    
+                    // Take 11 days ending at endIndex (so startIndex should be endIndex - 10, giving us 11 days)
+                    const startIndex = Math.max(0, endIndex - (daysPerPeriod - 1));
+                    periodSnapshots = snapshots.slice(startIndex, endIndex + 1);
+                    currentIndex = startIndex + daysPerPeriod;
+                }
+                
+                if (periodSnapshots.length > 0) {
+                    // Reverse so oldest is first (for chronological display)
+                    const reversed = periodSnapshots.reverse();
+                    
+                    // Get date range
+                    const oldestDate = new Date(reversed[0].snapshot_date);
+                    const newestDate = new Date(reversed[reversed.length - 1].snapshot_date);
+                    
+                    periods.push({
+                        snapshots: reversed,
+                        startDate: oldestDate,
+                        endDate: newestDate,
+                        index: periods.length
+                    });
+                } else {
+                    // No more snapshots
+                    break;
+                }
+            }
+            
+            return periods;
+        }
+        
+        // Render period cards
+        function renderPeriodCards(periods, container) {
+            if (periods.length === 0) {
+                container.innerHTML = '<div class="no-data" style="text-align:center;padding:40px;">No inventory periods found.</div>';
+                return;
+            }
+            
+            const formatDate = (date) => {
+                return date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                                year: 'numeric'
+                            });
+            };
+            
+            container.innerHTML = `
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">
+                    ${periods.map((period, idx) => {
+                        const startStr = formatDate(period.startDate);
+                        const endStr = formatDate(period.endDate);
+                        const snapshotCount = period.snapshots.length;
+                            
+                            return `
+                            <div style="background:white;padding:24px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.1);border:1px solid #e9ecef;cursor:pointer;transition:all 0.2s ease;"
+                                 onmouseover="this.style.boxShadow='0 6px 16px rgba(0,0,0,0.15)';this.style.transform='translateY(-2px)'"
+                                 onmouseout="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)';this.style.transform='none'"
+                                 onclick="viewPeriod(${idx})">
+                                <h3 style="margin:0 0 12px 0;color:#2c3e50;font-size:1.3rem;font-weight:700;">${startStr} - ${endStr}</h3>
+                                <p style="margin:0;color:#6c757d;font-size:0.9rem;">${snapshotCount} day${snapshotCount !== 1 ? 's' : ''} of inventory data</p>
+                                <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e9ecef;">
+                                    <div style="display:flex;gap:12px;align-items:center;">
+                                        <button 
+                                            onclick="event.stopPropagation();viewPeriod(${idx})"
+                                            style="flex:1;background:#007bff;color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.9rem;transition:all 0.2s ease;"
+                                            onmouseover="this.style.background='#0056b3'"
+                                            onmouseout="this.style.background='#007bff'">
+                                            👁️ View
+                                        </button>
+                                        <button 
+                                            onclick="event.stopPropagation();downloadPeriodExcel(${idx})"
+                                            style="flex:1;background:#28a745;color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.9rem;transition:all 0.2s ease;"
+                                            onmouseover="this.style.background='#218838'"
+                                            onmouseout="this.style.background='#28a745'">
+                                            📥 Download
+                                        </button>
+                                    </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+        }
+        
+        // View a specific period
+        function viewPeriod(periodIndex) {
+            const container = document.getElementById('historyListContainer');
+            const gridContainer = document.getElementById('gridViewContainer');
+            const downloadBtn = document.getElementById('downloadExcelBtn');
+            
+            // Get all snapshots and group them
+            const periods = groupIntoPeriods(allSnapshots, 11);
+            
+            if (periodIndex >= periods.length) {
+                showError('Period not found');
+                return;
+            }
+            
+            const period = periods[periodIndex];
+            currentPeriodIndex = periodIndex;
+            
+            // Build grid data for this period
+            gridData = buildInventoryGrid(period.snapshots);
+            
+            // Show grid view, hide cards
+            container.style.display = 'none';
+            gridContainer.style.display = 'block';
+            downloadBtn.style.display = 'inline-block';
+            updateBackToCardsButton();
+            
+            // Render grid
+            renderInventoryGrid(gridData, period.snapshots, gridContainer);
+            
+            // Update title to show period range
+            const formatDate = (date) => {
+                return date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                });
+            };
+            document.getElementById('storeTitle').textContent = 
+                `Inventory History — ${formatDate(period.startDate)} to ${formatDate(period.endDate)}`;
+        }
+        
+        // Go back to card view
+        function backToCards() {
+            const container = document.getElementById('historyListContainer');
+            const gridContainer = document.getElementById('gridViewContainer');
+            const downloadBtn = document.getElementById('downloadExcelBtn');
+            
+            container.style.display = 'block';
+            gridContainer.style.display = 'none';
+            downloadBtn.style.display = 'none';
+            currentPeriodIndex = null;
+            updateBackToCardsButton();
+            
+            // Reset title
+            document.getElementById('storeTitle').textContent = `Inventory History — ${storeName}`;
+            
+            // Refresh history immediately when returning to cards view to show latest updates
+            loadInventoryHistory();
+        }
+        
+        // Download Excel for a specific period
+        async function downloadPeriodExcel(periodIndex) {
+            const periods = groupIntoPeriods(allSnapshots, 11);
+            
+            if (periodIndex >= periods.length) {
+                showError('Period not found');
+                return;
+            }
+            
+            const period = periods[periodIndex];
+            const gridData = buildInventoryGrid(period.snapshots);
+            
+            await downloadInventoryExcelFromData(gridData, period.snapshots);
+        }
+        
+        // Build inventory grid from snapshots
+        function buildInventoryGrid(snapshots) {
+            // Collect all unique items (SKU + Name combinations)
+            const itemMap = new Map();
+            
+            snapshots.forEach(snapshot => {
+                const items = snapshot.items || [];
+                items.forEach(item => {
+                    const key = `${item.sku || ''}|${item.name || ''}`;
+                    if (!itemMap.has(key)) {
+                        itemMap.set(key, {
+                            sku: item.sku || '',
+                            name: item.name || item.item_name || 'Unknown',
+                            quantities: {}
+                        });
+                    }
+                });
+            });
+            
+            // Fill quantities for each date
+            snapshots.forEach(snapshot => {
+                const dateStr = normalizeDate(snapshot.snapshot_date);
+                const items = snapshot.items || [];
+                
+                items.forEach(item => {
+                    const key = `${item.sku || ''}|${item.name || ''}`;
+                    if (itemMap.has(key)) {
+                        itemMap.get(key).quantities[dateStr] = item.quantity || 0;
+                    }
+                });
+            });
+            
+            // Convert to array and sort by name
+            const items = Array.from(itemMap.values()).sort((a, b) => {
+                return (a.name || '').localeCompare(b.name || '');
+            });
+            
+            return {
+                items: items,
+                dates: snapshots.map(s => normalizeDate(s.snapshot_date))
+            };
+        }
+        
+        // Normalize date to YYYY-MM-DD format
+        function normalizeDate(dateStr) {
+            if (!dateStr) return '';
+                    const match = String(dateStr).match(/^(\d{4}-\d{2}-\d{2})/);
+                    return match ? match[1] : dateStr;
+        }
+        
+        // Render inventory grid
+        function renderInventoryGrid(data, snapshots, targetContainer = null) {
+            const container = targetContainer || document.getElementById('historyListContainer');
+            
+            if (!data || !data.items || data.items.length === 0) {
+                container.innerHTML = '<div class="no-data" style="text-align:center;padding:40px;">No inventory items found.</div>';
+                return;
+            }
+            
+            // Format dates for display
+            const dateHeaders = data.dates.map(dateStr => {
+                const date = new Date(dateStr + 'T00:00:00');
+                return date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                });
+            });
+            
+            // Calculate totals for phones and simcards
+            const phonesTotal = {};
+            const simcardsTotal = {};
+            
+            data.dates.forEach(dateStr => {
+                let phonesSum = 0;
+                let simcardsSum = 0;
+                
+                data.items.forEach(item => {
+                    const qty = item.quantities[dateStr] || 0;
+                    // Assuming all items except simcards are phones/devices
+                    // You may need to adjust this logic based on your data
+                    const nameLower = (item.name || '').toLowerCase();
+                    if (nameLower.includes('sim') || nameLower.includes('simcard')) {
+                        simcardsSum += qty;
+                    } else {
+                        phonesSum += qty;
+                    }
+                });
+                
+                phonesTotal[dateStr] = phonesSum;
+                simcardsTotal[dateStr] = simcardsSum;
+            });
+            
+            let html = `
+                <div class="inventory-grid-container">
+                    <table class="inventory-grid-table">
+                        <thead>
+                            <tr>
+                                <th class="item-header">Item Name</th>
+                                ${dateHeaders.map(header => `<th>${escapeHtml(header)}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            // Render item rows
+            data.items.forEach(item => {
+                html += '<tr>';
+                html += `<td class="item-cell">${escapeHtml(item.name || 'Unknown')}</td>`;
+                
+                data.dates.forEach(dateStr => {
+                    const qty = item.quantities[dateStr];
+                    if (qty !== undefined) {
+                        html += `<td>${qty}</td>`;
+                    } else {
+                        html += `<td class="empty-cell">-</td>`;
+                    }
+                });
+                
+                html += '</tr>';
+            });
+            
+            // Add phones row
+            html += '<tr class="special-row">';
+            html += `<td class="item-cell">phones</td>`;
+            data.dates.forEach(dateStr => {
+                const qty = phonesTotal[dateStr] || 0;
+                html += `<td>${qty}</td>`;
+            });
+            html += '</tr>';
+            
+            // Add simcards row
+            html += '<tr class="special-row">';
+            html += `<td class="item-cell">simcard</td>`;
+            data.dates.forEach(dateStr => {
+                const qty = simcardsTotal[dateStr] || 0;
+                html += `<td>${qty}</td>`;
+            });
+            html += '</tr>';
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+        
+        // Download inventory as Excel in the grid format (from current grid view)
+        async function downloadInventoryExcel() {
+            if (!gridData) {
+                showWarning('No inventory data available to download.');
+                    return;
+                }
+            
+            // Get snapshots for current period
+            const periods = groupIntoPeriods(allSnapshots, 11);
+            let snapshots = [];
+            
+            if (currentPeriodIndex !== null && currentPeriodIndex < periods.length) {
+                snapshots = periods[currentPeriodIndex].snapshots;
+            } else {
+                // Fallback: use latest 11 if no period selected
+                snapshots = allSnapshots.slice(0, 11).reverse();
+            }
+            
+            await downloadInventoryExcelFromData(gridData, snapshots);
+        }
+        
+        // Download Excel from grid data
+        async function downloadInventoryExcelFromData(data, snapshots) {
+            try {
+                // Prepare Excel data - rows are items, columns are dates
+                const excelData = [];
+                
+                // Header row: Item Name + dates
+                const headerRow = ['Item Name'];
+                const dateHeaders = data.dates.map(dateStr => {
+                    const date = new Date(dateStr + 'T00:00:00');
+                    return date.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    });
+                });
+                headerRow.push(...dateHeaders);
+                excelData.push(headerRow);
+                
+                // Item rows
+                data.items.forEach(item => {
+                    const row = [item.name || 'Unknown'];
+                    data.dates.forEach(dateStr => {
+                        const qty = item.quantities[dateStr];
+                        row.push(qty !== undefined ? qty : '');
+                    });
+                    excelData.push(row);
+                });
+                
+                // Calculate totals for phones and simcards
+                const phonesTotal = {};
+                const simcardsTotal = {};
+                
+                data.dates.forEach(dateStr => {
+                    let phonesSum = 0;
+                    let simcardsSum = 0;
+                    
+                    data.items.forEach(item => {
+                        const qty = item.quantities[dateStr] || 0;
+                        const nameLower = (item.name || '').toLowerCase();
+                        if (nameLower.includes('sim') || nameLower.includes('simcard')) {
+                            simcardsSum += qty;
+                        } else {
+                            phonesSum += qty;
+                        }
+                    });
+                    
+                    phonesTotal[dateStr] = phonesSum;
+                    simcardsTotal[dateStr] = simcardsSum;
+                });
+                
+                // Add phones row
+                const phonesRow = ['phones'];
+                data.dates.forEach(dateStr => {
+                    phonesRow.push(phonesTotal[dateStr] || 0);
+                });
+                excelData.push(phonesRow);
+                
+                // Add simcards row
+                const simcardsRow = ['simcard'];
+                data.dates.forEach(dateStr => {
+                    simcardsRow.push(simcardsTotal[dateStr] || 0);
+                });
+                excelData.push(simcardsRow);
+                
+                // Create workbook
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(excelData);
+                
+                // Set column widths
+                ws['!cols'] = [
+                    { wch: 30 }  // Item Name column
+                ];
+                // Add width for each date column
+                data.dates.forEach(() => {
+                    ws['!cols'].push({ wch: 15 });
+                });
+                
+                // Add worksheet to workbook
+                XLSX.utils.book_append_sheet(wb, ws, 'Inventory History');
+                
+                // Generate filename with date range if available
+                const safeStoreName = storeName.replace(/[^a-zA-Z0-9_-]/g, '_');
+                let filename = `${safeStoreName}_Inventory_History`;
+                
+                if (snapshots.length > 0) {
+                    const startDate = new Date(snapshots[0].snapshot_date).toISOString().split('T')[0];
+                    const endDate = new Date(snapshots[snapshots.length - 1].snapshot_date).toISOString().split('T')[0];
+                    filename += `_${startDate}_to_${endDate}`;
+                }
+                
+                filename += '.xlsx';
+                
+                // Download
+                XLSX.writeFile(wb, filename);
+                
+                console.log('Excel file downloaded successfully:', filename);
+                showSuccess('Inventory history downloaded successfully!');
+                
+            } catch (err) {
+                console.error('Failed to download Excel:', err);
+                showError('Failed to download Excel file: ' + (err.message || 'Unknown error'));
+            }
+        }
+        
+        // Make functions global
+        window.downloadInventoryExcel = downloadInventoryExcel;
+        window.viewPeriod = viewPeriod;
+        window.downloadPeriodExcel = downloadPeriodExcel;
+        window.backToCards = backToCards;
+        window.loadInventoryHistory = loadInventoryHistory;  // Make accessible for refresh
+        
+        // Auto-refresh inventory history every 10 seconds to show real-time updates
+        let autoRefreshInterval = null;
+        function startAutoRefresh() {
+            // Clear existing interval if any
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+            // Refresh every 10 seconds
+            autoRefreshInterval = setInterval(() => {
+                // Only refresh if not in grid view (to avoid disrupting user's view)
+                const gridContainer = document.getElementById('gridViewContainer');
+                if (gridContainer && gridContainer.style.display !== 'block') {
+                    loadInventoryHistory();
+                }
+            }, 10000); // 10 seconds
+        }
+        
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+        
+        // Start auto-refresh when page loads
+        startAutoRefresh();
+        
+        // Stop auto-refresh when user navigates away
+        window.addEventListener('beforeunload', stopAutoRefresh);
+        
+        // Load data
+        loadInventoryHistory();
+    </script>
+</body>
+</html>

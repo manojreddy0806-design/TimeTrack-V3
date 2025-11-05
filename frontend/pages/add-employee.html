@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Add Employee — TimeTrack</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+    <style>
+        .add-employee-container {
+            max-width: 800px;
+            margin: 40px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 24px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        .camera-section {
+            margin: 24px 0;
+            text-align: center;
+        }
+        #videoPreview {
+            width: 100%;
+            max-width: 640px;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+            display: none;
+        }
+        #capturedImage {
+            width: 100%;
+            max-width: 640px;
+            border-radius: 8px;
+            border: 2px solid #28a745;
+            display: none;
+            margin-top: 16px;
+        }
+        .camera-controls {
+            margin-top: 16px;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .status-message {
+            margin: 16px 0;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+        .status-message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .face-status {
+            margin-top: 12px;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        .face-status.not-captured {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .face-status.captured {
+            background: #d4edda;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="nav-left">
+            <div class="logo">⏰ TimeTrack</div>
+            <nav class="nav-links">
+                <a href="manager.html">Dashboard</a>
+                <a href="add-employee.html">Add Employee</a>
+                <a href="list-employees.html">List Employees</a>
+            </nav>
+        </div>
+        <div class="nav-right">
+            <a href="#" class="btn-logout" onclick="logoutApp()">Logout</a>
+        </div>
+    </div>
+    
+    <div class="add-employee-container">
+        <h2 style="margin-top: 0; color: #2c3e50;">Add New Employee</h2>
+        
+        <!-- Prominent Error Display -->
+        <div id="errorBox" style="display: none; background: #f8d7da; border: 2px solid #dc3545; border-radius: 8px; padding: 16px; margin: 16px 0; color: #721c24;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 1.5rem;">⚠️</span>
+                <div>
+                    <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 4px;">ERROR</div>
+                    <div id="errorMessage" style="font-size: 1rem;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="statusMessage" class="status-message"></div>
+        
+        <form id="addEmployeeForm">
+            <div class="form-group">
+                <label for="employeeName">Employee Name *</label>
+                <input type="text" id="employeeName" placeholder="Enter employee name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="employeeRole">Role</label>
+                <input type="text" id="employeeRole" placeholder="e.g., Employee, Supervisor" value="Employee">
+            </div>
+            
+            <div class="form-group">
+                <label for="employeePhone">Phone Number</label>
+                <input type="tel" id="employeePhone" placeholder="e.g., +1 (555) 123-4567">
+            </div>
+            
+            <div class="form-group">
+                <label for="employeeHourlyPay">Hourly Pay</label>
+                <input type="number" id="employeeHourlyPay" placeholder="e.g., 15.00" step="0.01" min="0">
+            </div>
+            
+            <div class="form-group">
+                <label>Face Registration *</label>
+                <div id="faceStatus" class="face-status not-captured">
+                    ⚠️ Face not captured yet (Required)
+                </div>
+                
+                <div class="camera-section">
+                    <video id="videoPreview" autoplay playsinline></video>
+                    <img id="capturedImage" alt="Captured face">
+                    
+                    <div class="camera-controls">
+                        <button type="button" id="startCameraBtn" class="btn btn-primary">
+                            📷 Start Camera
+                        </button>
+                        <button type="button" id="captureFaceBtn" class="btn btn-success" style="display: none;">
+                            ✓ Capture Face
+                        </button>
+                        <button type="button" id="retakeBtn" class="btn btn-secondary" style="display: none;">
+                            🔄 Retake
+                        </button>
+                        <button type="button" id="stopCameraBtn" class="btn btn-danger" style="display: none;">
+                            ✕ Stop Camera
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 12px; margin-top: 32px;">
+                <button type="submit" class="btn btn-success" style="flex: 1;">
+                    ✓ Add Employee
+                </button>
+                <button type="button" onclick="window.location='manager.html'" class="btn btn-secondary">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <script src="static/js/face-recognition.js"></script>
+    <script src="static/js/script.js"></script>
+    <script>
+        let videoStream = null;
+        let faceDescriptor = null;
+        let capturedImageData = null;
+        
+
+        
+        // Show status message
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status-message ${type}`;
+            statusEl.style.display = 'block';
+            
+            if (type !== 'error') {
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        // Update face status
+        function updateFaceStatus(captured) {
+            const statusEl = document.getElementById('faceStatus');
+            if (captured) {
+                statusEl.className = 'face-status captured';
+                statusEl.textContent = '✓ Face captured successfully';
+            } else {
+                statusEl.className = 'face-status not-captured';
+                statusEl.textContent = '⚠️ Face not captured yet';
+            }
+        }
+        
+        // Start camera
+        document.getElementById('startCameraBtn').addEventListener('click', async () => {
+            // Hide error box when retrying
+            document.getElementById('errorBox').style.display = 'none';
+            
+            try {
+                showStatus('Loading face detection models...', 'info');
+                
+                // Load face-api models
+                const modelsLoaded = await loadFaceApiModels();
+                if (!modelsLoaded) {
+                    showStatus('Failed to load face detection models', 'error');
+                    return;
+                }
+                
+                showStatus('Starting camera...', 'info');
+                
+                // Request camera access
+                videoStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    } 
+                });
+                
+                const video = document.getElementById('videoPreview');
+                video.srcObject = videoStream;
+                video.style.display = 'block';
+                
+                document.getElementById('startCameraBtn').style.display = 'none';
+                document.getElementById('captureFaceBtn').style.display = 'inline-block';
+                document.getElementById('stopCameraBtn').style.display = 'inline-block';
+                
+                showStatus('Camera started. Position your face in the frame and click "Capture Face"', 'success');
+            } catch (err) {
+                console.error('Camera error:', err);
+                showStatus('Failed to access camera: ' + err.message, 'error');
+            }
+        });
+        
+        // Capture face
+        document.getElementById('captureFaceBtn').addEventListener('click', async () => {
+            try {
+                showStatus('Detecting face...', 'info');
+                
+                const video = document.getElementById('videoPreview');
+                const result = await captureFaceFromVideo(video);
+                
+                if (result.success) {
+                    faceDescriptor = result.descriptor;
+                    capturedImageData = result.imageDataUrl;
+                    
+                    // Show captured image
+                    const capturedImg = document.getElementById('capturedImage');
+                    capturedImg.src = capturedImageData;
+                    capturedImg.style.display = 'block';
+                    
+                    // Hide video and capture button
+                    video.style.display = 'none';
+                    document.getElementById('captureFaceBtn').style.display = 'none';
+                    document.getElementById('retakeBtn').style.display = 'inline-block';
+                    
+                    updateFaceStatus(true);
+                    showStatus('Face captured successfully!', 'success');
+                } else {
+                    showStatus('Face detection failed: ' + result.error, 'error');
+                }
+            } catch (err) {
+                console.error('Capture error:', err);
+                showStatus('Failed to capture face: ' + err.message, 'error');
+            }
+        });
+        
+        // Retake photo
+        document.getElementById('retakeBtn').addEventListener('click', () => {
+            const video = document.getElementById('videoPreview');
+            const capturedImg = document.getElementById('capturedImage');
+            
+            capturedImg.style.display = 'none';
+            video.style.display = 'block';
+            
+            document.getElementById('captureFaceBtn').style.display = 'inline-block';
+            document.getElementById('retakeBtn').style.display = 'none';
+            
+            faceDescriptor = null;
+            capturedImageData = null;
+            updateFaceStatus(false);
+            
+            showStatus('Ready to capture face again', 'info');
+        });
+        
+        // Stop camera
+        document.getElementById('stopCameraBtn').addEventListener('click', () => {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            
+            const video = document.getElementById('videoPreview');
+            video.style.display = 'none';
+            video.srcObject = null;
+            
+            document.getElementById('startCameraBtn').style.display = 'inline-block';
+            document.getElementById('captureFaceBtn').style.display = 'none';
+            document.getElementById('stopCameraBtn').style.display = 'none';
+            document.getElementById('retakeBtn').style.display = 'none';
+            
+            showStatus('Camera stopped', 'info');
+        });
+        
+        // Form submission
+        document.getElementById('addEmployeeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const employeeName = document.getElementById('employeeName').value.trim();
+            const employeeRole = document.getElementById('employeeRole').value.trim();
+            const employeePhone = document.getElementById('employeePhone').value.trim();
+            const employeeHourlyPay = document.getElementById('employeeHourlyPay').value.trim();
+            
+            if (!employeeName) {
+                showStatus('Please enter employee name', 'error');
+                return;
+            }
+            
+            if (!faceDescriptor) {
+                showStatus('Face registration is mandatory. Please capture employee face before submitting.', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('Creating employee...', 'info');
+                
+                // Parse hourly pay as float if provided
+                let hourlyPayValue = null;
+                if (employeeHourlyPay) {
+                    const parsed = parseFloat(employeeHourlyPay);
+                    if (!isNaN(parsed) && parsed >= 0) {
+                        hourlyPayValue = parsed;
+                    }
+                }
+                
+                // Create employee (no store assignment)
+                const empResult = await apiPost('/employees/', {
+                    store_id: null,
+                    name: employeeName,
+                    role: employeeRole || null,
+                    phone_number: employeePhone || null,
+                    hourly_pay: hourlyPayValue
+                });
+                
+                const employeeId = empResult.id;
+                
+                // Register face if captured
+                if (faceDescriptor && employeeId) {
+                    showStatus('Registering face...', 'info');
+                    
+                    try {
+                        const faceResult = await apiPost('/face/register', {
+                            employee_id: employeeId,
+                            face_descriptor: faceDescriptor,
+                            face_image: capturedImageData
+                        });
+                        
+                        if (faceResult.success) {
+                            showStatus('Employee added successfully with face registration!', 'success');
+                        } else {
+                            showStatus('Employee added but face registration failed', 'error');
+                        }
+                    } catch (faceErr) {
+                        // Check if it's a duplicate face error
+                        if (faceErr.message && faceErr.message.includes('already registered')) {
+                            // Delete the employee we just created since face is duplicate
+                            try {
+                                await apiDelete(`/employees/${employeeId}`);
+                                console.log('Employee deleted successfully due to duplicate face');
+                            } catch (delErr) {
+                                console.error('Failed to delete employee:', delErr);
+                            }
+                            
+                            // Show prominent error
+                            const errorBox = document.getElementById('errorBox');
+                            const errorMessage = document.getElementById('errorMessage');
+                            errorMessage.textContent = faceErr.message;
+                            errorBox.style.display = 'block';
+                            
+                            // Scroll to top to show error
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                            
+                            return; // Don't redirect
+                        } else {
+                            showStatus('Employee added but face registration failed: ' + faceErr.message, 'error');
+                        }
+                    }
+                } else {
+                    showStatus('Employee added successfully (without face registration)', 'success');
+                }
+                
+                // Stop camera if running
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                }
+                
+                // Redirect to list employees page after 2 seconds
+                setTimeout(() => {
+                    window.location = 'list-employees.html';
+                }, 2000);
+                
+            } catch (err) {
+                console.error('Failed to add employee:', err);
+                showStatus('Failed to add employee: ' + err.message, 'error');
+            }
+        });
+        
+        // Check session
+        const session = loadSession();
+        if (!session || session.role !== 'manager') {
+            window.location = 'index.html';
+        }
+    </script>
+</body>
+</html>

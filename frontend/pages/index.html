@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>TimeTrack — Login</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="login-container" id="loginForm">
+            <div class="login-logo">⏰ TimeTrack</div>
+            <div class="small" style="margin-bottom:12px">Store or Manager Login</div>
+            <div class="form-group"><label>Username</label><input id="username"
+                    placeholder="Enter username"></div>
+            <div class="form-group"><label>Password</label><input id="password" type="password"
+                    placeholder="Enter password"></div>
+            <div class="form-group"><label>YubiKey OTP</label><input id="yubikeyOtp" type="text"
+                    placeholder="Touch your YubiKey (or leave empty for manager login)" maxlength="44" autocomplete="off"></div>
+            <div style="font-size:0.85rem;color:#6c757d;margin:-8px 0 12px 0;padding:0 4px;">
+                💡 For store login: Touch your YubiKey to generate OTP. For manager login: Leave empty.
+            </div>
+            <button id="loginBtn" class="login-btn">🔐 Login</button>
+            <div id="loginMessage" class="message" style="display:none"></div>
+        </div>
+    </div>
+    <script src="static/js/script.js"></script>
+</body>
+
+</html>

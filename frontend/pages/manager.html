@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Manager Dashboard — TimeTrack</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+    <div class="navbar">
+        <div class="nav-left">
+            <div class="logo">⏰ TimeTrack</div>
+            <nav class="nav-links">
+                <a href="manager.html">Dashboard</a>
+                <a href="add-employee.html">Add Employee</a>
+                <a href="list-employees.html">List Employees</a>
+            </nav>
+        </div>
+        <div class="nav-right">
+            
+            <a href="#" class="btn-logout" onclick="logoutApp()">Logout</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px;margin-bottom:24px;">
+            <h2 style="margin:0">Manager Dashboard — Store Overview</h2>
+            <button onclick="handleAddStore()" style="background:#28a745;color:white;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:1rem;transition:all 0.2s ease;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background='#218838';this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 12px rgba(40,167,69,0.3)'" onmouseout="this.style.background='#28a745';this.style.transform='none';this.style.boxShadow='none'">
+                <span style="font-size:1.1rem;">+</span> Add Store
+            </button>
+        </div>
+        <div id="managerRoot">
+            <div id="managerCards"></div>
+        </div>
+    </div>
+    
+    <!-- Add Store Modal -->
+    <div id="addStoreModal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>➕ Add New Store</h3>
+                <button class="modal-close" onclick="closeAddStoreModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="addStoreError" class="modal-error"></div>
+                <form id="addStoreForm">
+                    <div class="modal-form-group">
+                        <label for="storeName">Store Name *</label>
+                        <input type="text" id="storeName" name="storeName" placeholder="Enter store name (e.g., Lawrence)" required autofocus>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="storeTotalBoxes">Total Boxes *</label>
+                        <input type="number" id="storeTotalBoxes" name="storeTotalBoxes" placeholder="Enter total boxes (positive integer)" min="1" step="1" required>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="storeUsername">Username *</label>
+                        <input type="text" id="storeUsername" name="storeUsername" placeholder="Enter username" required>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="storePassword">Password *</label>
+                        <input type="password" id="storePassword" name="storePassword" placeholder="Enter password" required>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="storeConfirmPassword">Confirm Password *</label>
+                        <input type="password" id="storeConfirmPassword" name="storeConfirmPassword" placeholder="Confirm password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="modal-btn modal-btn-secondary" onclick="closeAddStoreModal()">Cancel</button>
+                <button type="button" class="modal-btn modal-btn-primary" onclick="submitAddStore()">Add Store</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Store Modal -->
+    <div id="editStoreModal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>✏️ Edit Store</h3>
+                <button class="modal-close" onclick="closeEditStoreModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="editStoreError" class="modal-error"></div>
+                <form id="editStoreForm">
+                    <input type="hidden" id="editStoreOriginalName" name="editStoreOriginalName">
+                    <div class="modal-form-group">
+                        <label for="editStoreName">Store Name *</label>
+                        <input type="text" id="editStoreName" name="editStoreName" placeholder="Enter store name" required autofocus>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="editStoreTotalBoxes">Total Boxes *</label>
+                        <input type="number" id="editStoreTotalBoxes" name="editStoreTotalBoxes" placeholder="Enter total boxes (positive integer)" min="1" step="1" required>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="editStoreUsername">Username *</label>
+                        <input type="text" id="editStoreUsername" name="editStoreUsername" placeholder="Enter username" required>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="editStorePassword">Password *</label>
+                        <input type="password" id="editStorePassword" name="editStorePassword" placeholder="Enter password" required>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="editStoreConfirmPassword">Confirm Password *</label>
+                        <input type="password" id="editStoreConfirmPassword" name="editStoreConfirmPassword" placeholder="Confirm password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="modal-btn modal-btn-secondary" onclick="closeEditStoreModal()">Cancel</button>
+                <button type="button" class="modal-btn modal-btn-primary" onclick="submitEditStore()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Manage YubiKeys Modal -->
+    <div id="manageYubikeysModal" class="modal-overlay">
+        <div class="modal-container" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>🔑 Manage YubiKeys</h3>
+                <button class="modal-close" onclick="closeManageYubikeysModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="manageYubikeysError" class="modal-error"></div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display:block;margin-bottom:8px;font-weight:600;">Store: <span id="manageYubikeysStoreName" style="color:#007bff;"></span></label>
+                    <p style="margin:8px 0;color:#6c757d;font-size:0.9rem;">Only authorized YubiKeys can login to this store. Employees must use their registered YubiKey.</p>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin:0 0 12px 0;">Register New YubiKey</h4>
+                    <div style="background:#e7f3ff;padding:12px;border-radius:8px;margin-bottom:12px;">
+                        <div class="modal-form-group" style="margin-bottom:12px;">
+                            <label for="yubikeyOtpInput">YubiKey OTP *</label>
+                            <input type="text" id="yubikeyOtpInput" placeholder="Touch your YubiKey to generate OTP" maxlength="44" autocomplete="off" style="font-family:monospace;letter-spacing:1px;">
+                            <small style="display:block;margin-top:4px;color:#6c757d;font-size:0.85rem;">Touch your YubiKey while this field is focused</small>
+                        </div>
+                        <div class="modal-form-group" style="margin-bottom:12px;">
+                            <label for="yubikeyNameInput">YubiKey Name (optional)</label>
+                            <input type="text" id="yubikeyNameInput" placeholder="e.g., Store PC YubiKey" maxlength="100">
+                        </div>
+                        <button type="button" class="modal-btn modal-btn-primary" onclick="registerCurrentYubikey()" style="padding:8px 16px;font-size:0.9rem;">Register YubiKey</button>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 style="margin:0 0 12px 0;">Authorized YubiKeys</h4>
+                    <div id="authorizedYubikeysList" style="max-height:300px;overflow-y:auto;">
+                        <p style="text-align:center;color:#6c757d;padding:20px;">Loading YubiKeys...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="modal-btn modal-btn-secondary" onclick="closeManageYubikeysModal()">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="static/js/script.js"></script>
+</body>
+</html>

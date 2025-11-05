@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Time Clock — TimeTrack</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    <!-- Load face-api.js from CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+</head>
+<body>
+    <div class="navbar">
+        <div class="nav-left">
+            <div class="logo">⏰ TimeTrack</div>
+            <nav class="nav-links">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="timeclock.html">Time Clock</a>
+                <a href="inventory.html">Inventory</a>
+                <a href="eod.html">End of Day</a>
+            </nav>
+        </div>
+        <div class="nav-right">
+            <a href="#" class="btn-logout" onclick="logoutApp()">Logout</a>
+        </div>
+    </div>
+    <div class="container">
+        <div id="timeclockTabRoot" class="card timeclock-container">
+            <h2>⏰ Time Clock</h2>
+            <div id="statusText" style="margin:16px 0;font-size:1.1rem;color:#6c757d;font-weight:500;">Ready to Clock In</div>
+            <div class="time-display" id="timeDisplay">--:--:--</div>
+            
+            <!-- Clock In/Out Buttons -->
+            <div id="clockButtons" style="display:flex;gap:16px;justify-content:center;margin:24px 0;">
+                <button id="clockInBtn" class="clock-btn" style="background:#28a745;color:white;padding:16px 32px;font-size:1.1rem;border:none;border-radius:8px;cursor:pointer;transition:all 0.2s;">
+                    🕐 Clock In
+                </button>
+                <button id="clockOutBtn" class="clock-btn" style="background:#dc3545;color:white;padding:16px 32px;font-size:1.1rem;border:none;border-radius:8px;cursor:pointer;transition:all 0.2s;">
+                    🕕 Clock Out
+                </button>
+            </div>
+            
+            <!-- Camera Container -->
+            <div class="camera-container" id="cameraContainer" style="display:none;margin-top:24px;">
+                <div style="position:relative;max-width:640px;margin:0 auto;">
+                    <video id="video" autoplay playsinline style="width:100%;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);"></video>
+                    <div id="detectionOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></div>
+                </div>
+                <div style="margin-top:16px;display:flex;justify-content:center;gap:12px">
+                    <button id="captureBtn" class="clock-btn" style="background:#28a745;color:white;padding:12px 24px;border:none;border-radius:8px;cursor:pointer;">
+                        📸 Capture Face
+                    </button>
+                    <button id="cancelCameraBtn" class="clock-btn" style="background:#6c757d;color:white;padding:12px 24px;border:none;border-radius:8px;cursor:pointer;">
+                        ❌ Cancel
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Photo Preview -->
+            <div id="photoPreview" style="display:none;margin-top:24px;">
+                <div style="max-width:400px;margin:0 auto;">
+                    <img id="capturedPhoto" alt="Captured" style="width:100%;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);" />
+                    <div id="recognitionResult" style="margin:16px 0;padding:16px;background:#f8f9fa;border-radius:8px;text-align:center;"></div>
+                </div>
+                <div style="margin-top:16px;display:flex;justify-content:center;gap:12px">
+                    <button id="confirmPhotoBtn" class="clock-btn" style="background:#28a745;color:white;padding:12px 24px;border:none;border-radius:8px;cursor:pointer;">
+                        ✅ Confirm
+                    </button>
+                    <button id="retakeBtn" class="clock-btn" style="background:#ffc107;color:#212529;padding:12px 24px;border:none;border-radius:8px;cursor:pointer;">
+                        🔄 Retake
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Loading Indicator -->
+            <div id="loadingIndicator" style="display:none;margin-top:24px;text-align:center;">
+                <div style="display:inline-block;width:40px;height:40px;border:4px solid #f3f3f3;border-top:4px solid #007bff;border-radius:50%;animation:spin 1s linear infinite;"></div>
+                <p style="margin-top:12px;color:#6c757d;">Processing...</p>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .clock-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .clock-btn:active {
+            transform: translateY(0);
+        }
+        
+        .clock-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+    
+    <script src="static/js/face-recognition.js"></script>
+    <script src="static/js/script.js"></script>
+    <script src="static/js/timeclock-handler.js"></script>
+</body>
+</html>

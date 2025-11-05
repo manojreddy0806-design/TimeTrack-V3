@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Store Inventory Management — TimeTrack</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    <style>
+        .inventory-table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        .stage-input {
+            width: 80px;
+            padding: 6px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stage-btn {
+            background: #007bff;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+        .stage-btn:hover {
+            background: #0056b3;
+            transform: translateY(-1px);
+        }
+        .special-row {
+            background: #fff3cd;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="nav-left">
+            <div class="logo">⏰ TimeTrack</div>
+            <nav class="nav-links">
+                <a href="manager.html">Manager Dashboard</a>
+            </nav>
+        </div>
+        <div class="nav-right">
+            <a href="#" class="btn-logout" onclick="logoutApp()">Logout</a>
+        </div>
+    </div>
+    <div class="container">
+        <div id="inventoryRoot">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h2 id="storeTitle" style="margin:0;">📦 Inventory Management</h2>
+                <button id="backBtn" class="bulk-update-btn" style="background:#6c757d">← Back to Manager</button>
+            </div>
+            <div style="margin-top:8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                <button id="addItemBtn" class="stage-btn" style="background:#6f42c1" onclick="window.openAddItemModal(); return false;">➕ Add Item</button>
+                <input id="inventorySearch" placeholder="Search items (name or SKU)" style="flex:1;min-width:240px;padding:10px;border:2px solid #e1e5e9;border-radius:8px" />
+            </div>
+            
+            <div class="inventory-table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Device Name</th>
+                            <th>SKU</th>
+                            <th>Current Qty</th>
+                            <th>Stage</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventoryTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Item Modal -->
+    <div id="editItemModal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>✏️ Edit Item</h3>
+                <button class="modal-close" onclick="closeEditItemModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="editItemError" class="modal-error"></div>
+                <form id="editItemForm">
+                    <div class="modal-form-group">
+                        <label for="editItemName">Item Name *</label>
+                        <input type="text" id="editItemName" name="editItemName" placeholder="Enter item name" required autofocus>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="editItemSku">SKU *</label>
+                        <input type="text" id="editItemSku" name="editItemSku" placeholder="Enter SKU (e.g., APP001)" required>
+                    </div>
+                    <input type="hidden" id="editItemOldSku" name="editItemOldSku">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="modal-btn modal-btn-secondary" onclick="closeEditItemModal()">Cancel</button>
+                <button type="button" class="modal-btn modal-btn-primary" onclick="submitEditItem()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Item Modal -->
+    <div id="addItemModal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>➕ Add New Item</h3>
+                <button class="modal-close" onclick="closeAddItemModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="addItemError" class="modal-error"></div>
+                <form id="addItemForm">
+                    <div class="modal-form-group">
+                        <label for="itemName">Item Name *</label>
+                        <input type="text" id="itemName" name="itemName" placeholder="Enter item name" required autofocus>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="itemSku">SKU *</label>
+                        <input type="text" id="itemSku" name="itemSku" placeholder="Enter SKU (e.g., APP001)" required>
+                    </div>
+                    <div class="modal-form-group">
+                        <label for="itemQuantity">Initial Quantity</label>
+                        <input type="number" id="itemQuantity" name="itemQuantity" placeholder="0" value="0" min="0">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="modal-btn modal-btn-secondary" onclick="closeAddItemModal()">Cancel</button>
+                <button type="button" class="modal-btn modal-btn-primary" onclick="submitAddItem()">Add Item</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="static/js/script.js"></script>
+</body>
+</html>

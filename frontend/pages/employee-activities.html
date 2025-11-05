@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Employee Activities — TimeTrack</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .activities-container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        .employee-info-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .employee-info-card h3 {
+            margin: 0 0 8px 0;
+            font-size: 1.8rem;
+        }
+        .employee-info-card p {
+            margin: 0;
+            opacity: 0.9;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #007bff;
+            margin-bottom: 8px;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .activities-table {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .table-header {
+            background: #f8f9fa;
+            padding: 16px 24px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .table-header h3 {
+            margin: 0;
+            color: #2c3e50;
+        }
+        .activities-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .activity-row {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e9ecef;
+            display: grid;
+            grid-template-columns: 150px 120px 120px 120px 150px 1fr;
+            gap: 16px;
+            align-items: center;
+            transition: background 0.2s ease;
+        }
+        .activity-row:hover {
+            background: #f8f9fa;
+        }
+        .activity-row:last-child {
+            border-bottom: none;
+        }
+        .activity-date {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .activity-day {
+            color: #6c757d;
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+        .activity-time {
+            color: #495057;
+            font-size: 0.95rem;
+        }
+        .activity-hours {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #007bff;
+        }
+        .activity-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .status-complete {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-active {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+        }
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        @media (max-width: 768px) {
+            .activity-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="nav-left">
+            <div class="logo">⏰ TimeTrack</div>
+            <nav class="nav-links">
+               <a href="manager.html">Dashboard</a>
+                <a href="add-employee.html">Add Employee</a>
+                <a href="list-employees.html">List Employees</a>
+            </nav>
+        </div>
+        <div class="nav-right">
+            <a href="#" class="btn-logout" onclick="logoutApp()">Logout</a>
+        </div>
+    </div>
+    
+    <div class="activities-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <h2 style="margin: 0; color: #2c3e50;">Employee Activities</h2>
+            <button onclick="window.history.back()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                ← Back
+            </button>
+        </div>
+        
+        <div id="employeeInfoCard" style="display: none;"></div>
+        <div id="statsGrid" style="display: none;"></div>
+        <div id="activitiesTable" style="display: none;"></div>
+        
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-state-icon">📊</div>
+            <p style="font-size: 1.1rem; margin-bottom: 8px;">No employee selected</p>
+            <p style="font-size: 0.9rem;">Please select an employee from the list</p>
+        </div>
+        
+        <div id="loadingState" class="loading" style="display: none;">
+            <p>Loading activities...</p>
+        </div>
+    </div>
+    
+    <script src="static/js/script.js"></script>
+    <script>
+        let allEmployees = [];
+        let selectedEmployee = null;
+        let allEntries = []; // Store all entries for filtering
+        
+        // Load all employees
+        async function loadAllEmployees() {
+            try {
+                allEmployees = await apiGet('/employees/');
+            } catch (err) {
+                console.error('Failed to load employees:', err);
+            }
+        }
+        
+        // Load employee activities
+        async function loadEmployeeActivities(employeeId) {
+            try {
+                document.getElementById('loadingState').style.display = 'block';
+                document.getElementById('emptyState').style.display = 'none';
+                document.getElementById('employeeInfoCard').style.display = 'none';
+                document.getElementById('statsGrid').style.display = 'none';
+                document.getElementById('activitiesTable').style.display = 'none';
+                
+                // Find selected employee
+                selectedEmployee = allEmployees.find(emp => emp.employee_id === employeeId);
+                
+                if (!selectedEmployee) {
+                    throw new Error('Employee not found');
+                }
+                
+                // Get employee activities
+                const response = await fetch(`/api/timeclock/employee/${employeeId}/history`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load activities');
+                }
+                
+                document.getElementById('loadingState').style.display = 'none';
+                
+                // Store all entries for filtering
+                allEntries = data.entries || [];
+                
+                // Display without filters initially
+                loadEmployeeActivitiesWithFilter(employeeId, null, null);
+                
+            } catch (err) {
+                console.error('Failed to load activities:', err);
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('emptyState').innerHTML = `
+                    <div class="empty-state-icon">⚠️</div>
+                    <p style="font-size: 1.1rem; color: #dc3545;">Failed to load activities</p>
+                    <p style="font-size: 0.9rem;">${err.message}</p>
+                `;
+                document.getElementById('emptyState').style.display = 'block';
+            }
+        }
+        
+        // Display employee info card
+        function displayEmployeeInfo(employee, totalHours = 0) {
+            const card = document.getElementById('employeeInfoCard');
+            
+            // Calculate earnings if hourly pay is available
+            let earningsHtml = '';
+            if (employee.hourly_pay !== undefined && employee.hourly_pay !== null && totalHours > 0) {
+                const earnings = totalHours * employee.hourly_pay;
+                earningsHtml = `
+                    <p style="margin-top: 8px; font-size: 1.1rem; font-weight: 600; opacity: 1;">
+                        Earnings: <span style="font-size: 1.3rem; color: #28a745;">$${earnings.toFixed(2)}</span>
+                    </p>
+                `;
+            }
+            
+            card.innerHTML = `
+                <h3>${escapeHtml(employee.name)}</h3>
+                <p>${escapeHtml(employee.role || 'Employee')} • ${escapeHtml(employee.store_id)}</p>
+                <p style="margin-top: 12px; font-size: 1.1rem; font-weight: 600; opacity: 1;">
+                    Total Hours: <span style="font-size: 1.3rem;">${totalHours.toFixed(2)} hrs</span>
+                </p>
+                ${earningsHtml}
+            `;
+            card.className = 'employee-info-card';
+            card.style.display = 'block';
+        }
+        
+        // Calculate and display statistics
+        function displayStatistics(entries) {
+            const totalDays = entries.length;
+            let totalHours = 0;
+            let completedShifts = 0;
+            
+            entries.forEach(entry => {
+                if (entry.hours_worked) {
+                    totalHours += entry.hours_worked;
+                    completedShifts++;
+                }
+            });
+            
+            const avgHours = completedShifts > 0 ? (totalHours / completedShifts).toFixed(2) : 0;
+            
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${totalDays}</div>
+                    <div class="stat-label">Total Days</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${totalHours.toFixed(2)}</div>
+                    <div class="stat-label">Total Hours</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgHours}</div>
+                    <div class="stat-label">Avg Hours/Day</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${completedShifts}</div>
+                    <div class="stat-label">Completed Shifts</div>
+                </div>
+            `;
+            statsGrid.className = 'stats-grid';
+            statsGrid.style.display = 'grid';
+        }
+        
+        // Display activities table
+        function displayActivities(entries, startDate = null, endDate = null) {
+            const table = document.getElementById('activitiesTable');
+            
+            // Entries are already filtered when passed to this function
+            const filteredEntries = entries;
+            
+            if (filteredEntries.length === 0) {
+                document.getElementById('emptyState').innerHTML = `
+                    <div class="empty-state-icon">📭</div>
+                    <p style="font-size: 1.1rem;">No activities found</p>
+                    <p style="font-size: 0.9rem;">${startDate || endDate ? 'No entries found for the selected date range' : 'This employee hasn\'t clocked in yet'}</p>
+                `;
+                document.getElementById('emptyState').style.display = 'block';
+                return;
+            }
+            
+            // Date range display text
+            let dateRangeText = '';
+            if (startDate && endDate) {
+                const startStr = new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const endStr = new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                dateRangeText = ` (${startStr} - ${endStr})`;
+            } else if (startDate) {
+                const startStr = new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                dateRangeText = ` (from ${startStr})`;
+            } else if (endDate) {
+                const endStr = new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                dateRangeText = ` (until ${endStr})`;
+            }
+            
+            let html = `
+                <div class="table-header">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <h3 style="margin: 0;">Activity History (${filteredEntries.length} entries${dateRangeText})</h3>
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <label for="startDate" style="font-size: 0.9rem; color: #6c757d; font-weight: 600;">Start:</label>
+                                <input type="date" id="startDate" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem;">
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <label for="endDate" style="font-size: 0.9rem; color: #6c757d; font-weight: 600;">End:</label>
+                                <input type="date" id="endDate" style="padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem;">
+                            </div>
+                            <button id="applyDateFilter" style="padding: 6px 16px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem;" 
+                                    onmouseover="this.style.background='#0056b3'" 
+                                    onmouseout="this.style.background='#007bff'">
+                                Apply
+                            </button>
+                            <button id="clearDateFilter" style="padding: 6px 16px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem;" 
+                                    onmouseover="this.style.background='#5a6268'" 
+                                    onmouseout="this.style.background='#6c757d'">
+                                Clear
+                            </button>
+                            <button id="downloadExcelBtn" style="padding: 6px 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem;" 
+                                    onmouseover="this.style.background='#218838'" 
+                                    onmouseout="this.style.background='#28a745'">
+                                📥 Download Excel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="activities-list">
+            `;
+            
+            filteredEntries.forEach(entry => {
+                const date = new Date(entry.clock_in);
+                const dateStr = date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: '2-digit',
+                    year: 'numeric'
+                });
+                const dayStr = date.toLocaleDateString('en-US', { weekday: 'long' });
+                
+                const clockInTime = date.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                
+                let clockOutTime = '-';
+                let hoursWorked = '-';
+                let statusHtml = '<span class="activity-status status-active">Active</span>';
+                
+                if (entry.clock_out) {
+                    const clockOutDate = new Date(entry.clock_out);
+                    clockOutTime = clockOutDate.toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                    });
+                    hoursWorked = entry.hours_worked ? `${entry.hours_worked.toFixed(2)} hrs` : '-';
+                    statusHtml = '<span class="activity-status status-complete">Complete</span>';
+                }
+                
+                const storeName = entry.store_id || 'N/A';
+                
+                html += `
+                    <div class="activity-row">
+                        <div>
+                            <div class="activity-date">${dateStr}</div>
+                            <div class="activity-day">${dayStr}</div>
+                        </div>
+                        <div>
+                            <div style="color:#6c757d;font-size:0.8rem;margin-bottom:2px;">Clock In</div>
+                            <div class="activity-time">${clockInTime}</div>
+                        </div>
+                        <div>
+                            <div style="color:#6c757d;font-size:0.8rem;margin-bottom:2px;">Clock Out</div>
+                            <div class="activity-time">${clockOutTime}</div>
+                        </div>
+                        <div>
+                            <div style="color:#6c757d;font-size:0.8rem;margin-bottom:2px;">Hours</div>
+                            <div class="activity-hours">${hoursWorked}</div>
+                        </div>
+                        <div>
+                            <div style="color:#6c757d;font-size:0.8rem;margin-bottom:2px;">Store</div>
+                            <div style="color:#495057;font-size:0.95rem;font-weight:600;">${storeName}</div>
+                        </div>
+                        <div>
+                            ${statusHtml}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            table.innerHTML = html;
+            table.className = 'activities-table';
+            table.style.display = 'block';
+            
+            // Set date inputs if filters were applied
+            if (startDate) {
+                document.getElementById('startDate').value = startDate;
+            }
+            if (endDate) {
+                document.getElementById('endDate').value = endDate;
+            }
+            
+            // Add event listeners for date filter buttons
+            document.getElementById('applyDateFilter').onclick = () => {
+                const start = document.getElementById('startDate').value;
+                const end = document.getElementById('endDate').value;
+                if (selectedEmployee) {
+                    loadEmployeeActivitiesWithFilter(selectedEmployee.employee_id, start || null, end || null);
+                }
+            };
+            
+            document.getElementById('clearDateFilter').onclick = () => {
+                document.getElementById('startDate').value = '';
+                document.getElementById('endDate').value = '';
+                if (selectedEmployee) {
+                    loadEmployeeActivitiesWithFilter(selectedEmployee.employee_id, null, null);
+                }
+            };
+            
+            // Add event listener for download Excel button
+            document.getElementById('downloadExcelBtn').onclick = () => {
+                downloadActivitiesExcel(filteredEntries, selectedEmployee, startDate, endDate);
+            };
+        }
+        
+        // Download activities as Excel
+        function downloadActivitiesExcel(entries, employee, startDate, endDate) {
+            try {
+                if (!employee || !entries || entries.length === 0) {
+                    showWarning('No activities to download');
+                    return;
+                }
+                
+                // Prepare data for Excel
+                const excelData = entries.map(entry => {
+                    const date = new Date(entry.clock_in);
+                    const dateStr = date.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: '2-digit',
+                        year: 'numeric'
+                    });
+                    const dayStr = date.toLocaleDateString('en-US', { weekday: 'long' });
+                    
+                    const clockInTime = date.toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                    });
+                    
+                    let clockOutTime = '-';
+                    let hoursWorked = 0;
+                    let status = 'Active';
+                    
+                    if (entry.clock_out) {
+                        const clockOutDate = new Date(entry.clock_out);
+                        clockOutTime = clockOutDate.toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                        });
+                        hoursWorked = entry.hours_worked || 0;
+                        status = 'Complete';
+                    }
+                    
+                    return {
+                        'Date': dateStr,
+                        'Day': dayStr,
+                        'Clock In': clockInTime,
+                        'Clock Out': clockOutTime,
+                        'Hours Worked': hoursWorked > 0 ? hoursWorked.toFixed(2) : '-',
+                        'Store': entry.store_id || 'N/A'
+                    };
+                });
+                
+                // Add summary row
+                const totalHours = entries.reduce((sum, entry) => {
+                    return sum + (entry.hours_worked || 0);
+                }, 0);
+                const completedShifts = entries.filter(e => e.clock_out).length;
+                
+                excelData.push({
+                    'Date': '',
+                    'Day': '',
+                    'Clock In': '',
+                    'Clock Out': 'TOTAL',
+                    'Hours Worked': totalHours.toFixed(2),
+                    'Store': `${completedShifts} completed`
+                });
+                
+                // Create workbook
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(excelData);
+                
+                // Set column widths
+                ws['!cols'] = [
+                    { wch: 15 },  // Date
+                    { wch: 12 },  // Day
+                    { wch: 12 },  // Clock In
+                    { wch: 12 },  // Clock Out
+                    { wch: 12 },  // Hours Worked
+                    { wch: 15 }   // Store
+                ];
+                
+                // Add worksheet to workbook
+                XLSX.utils.book_append_sheet(wb, ws, 'Activities');
+                
+                // Generate filename
+                let filename = `${employee.name.replace(/[^a-zA-Z0-9_-]/g, '_')}_Activities`;
+                if (startDate && endDate) {
+                    const startStr = new Date(startDate).toISOString().split('T')[0];
+                    const endStr = new Date(endDate).toISOString().split('T')[0];
+                    filename += `_${startStr}_to_${endStr}`;
+                } else if (startDate) {
+                    const startStr = new Date(startDate).toISOString().split('T')[0];
+                    filename += `_from_${startStr}`;
+                } else if (endDate) {
+                    const endStr = new Date(endDate).toISOString().split('T')[0];
+                    filename += `_until_${endStr}`;
+                }
+                filename += '.xlsx';
+                
+                // Download
+                XLSX.writeFile(wb, filename);
+                
+                console.log('Excel file downloaded successfully:', filename);
+                
+            } catch (err) {
+                console.error('Failed to download Excel:', err);
+                showError('Failed to download Excel file: ' + (err.message || 'Unknown error'));
+            }
+        }
+        
+        // Load and display employee activities with date filter
+        async function loadEmployeeActivitiesWithFilter(employeeId, startDate, endDate) {
+            // Filter entries by date range
+            let filteredEntries = allEntries;
+            
+            if (startDate || endDate) {
+                filteredEntries = allEntries.filter(entry => {
+                    const entryDate = new Date(entry.clock_in);
+                    const entryDateOnly = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate());
+                    
+                    if (startDate) {
+                        const start = new Date(startDate);
+                        const startOnly = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+                        if (entryDateOnly < startOnly) return false;
+                    }
+                    
+                    if (endDate) {
+                        const end = new Date(endDate);
+                        const endOnly = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+                        if (entryDateOnly > endOnly) return false;
+                    }
+                    
+                    return true;
+                });
+            }
+            
+            // Calculate total hours from filtered entries
+            let totalHours = 0;
+            filteredEntries.forEach(entry => {
+                if (entry.hours_worked) {
+                    totalHours += entry.hours_worked;
+                }
+            });
+            
+            // Display employee info with filtered total hours
+            displayEmployeeInfo(selectedEmployee, totalHours);
+            
+            // Display statistics with filtered entries
+            displayStatistics(filteredEntries);
+            
+            // Display activities table with filtered entries and dates for header display
+            displayActivities(filteredEntries, startDate, endDate);
+        }
+        
+        // Check session
+        const session = loadSession();
+        if (!session || session.role !== 'manager') {
+            window.location = 'index.html';
+        }
+        
+        // Load all employees on page load
+        loadAllEmployees().then(() => {
+            // Check if employeeId is provided in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const employeeId = urlParams.get('employeeId');
+            
+            if (employeeId) {
+                // Auto-load activities for the specified employee
+                loadEmployeeActivities(employeeId);
+            } else {
+                // No employee ID in URL - show empty state
+                document.getElementById('emptyState').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
